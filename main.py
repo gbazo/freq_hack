@@ -3,16 +3,27 @@ from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
-from database import init_db  # Removido o prefixo "app."
-from utils import carregar_dados_excel, buscar_presenca  # Removido o prefixo "app."
+from database import init_db
+from utils import carregar_dados_excel, buscar_presenca
 
 # Inicializar o aplicativo FastAPI
 app = FastAPI(title="Consulta Presença QR Code Hack Barão 2025")
 
+# Adicionar middleware para redirecionar HTTP para HTTPS
+app.add_middleware(HTTPSRedirectMiddleware)
+
+# Adicionar middleware para confiar apenas em hosts específicos
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=["freqhack-oc7i8jw8.b4a.run", "localhost", "127.0.0.1"]
+)
+
 # Configurar diretórios para templates e arquivos estáticos
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")  # Caminho ajustado
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Evento de inicialização
 @app.on_event("startup")
