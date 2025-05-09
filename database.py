@@ -3,6 +3,7 @@ import httpx
 import json
 import pandas as pd
 from dotenv import load_dotenv
+import glob
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -23,11 +24,11 @@ PARSE_HEADERS = {
 PRESENCA_CLASS = "Presenca"
 
 # Dados em memória para backup (caso o Parse Server não esteja disponível)
-# Atualizado para refletir o dia atual (09/05)
+# IMPORTANTE: Agora usando "numero_identificacao" em vez de "id_estudante"
 DADOS_EXEMPLO = {
-    12345: {
-        "nome": "ESTUDANTE",
-        "sobrenome": "TESTE",
+    1984957: {  # Número de identificação do aluno
+        "nome": "LEANDRO",
+        "sobrenome": "AUGUSTO ESTEVAM CRISTINA",
         "presencas": {
             "07/05/2025": "Presente",
             "08/05/2025 19:00": "Presente",
@@ -36,9 +37,20 @@ DADOS_EXEMPLO = {
             "09/05/2025 20:00": "Data Futura"
         }
     },
-    54321: {
-        "nome": "ALUNO",
-        "sobrenome": "EXEMPLO",
+    2165351: {  # Número de identificação do aluno
+        "nome": "LUCCAS",
+        "sobrenome": "ADELINO JORDÃO DA SILVA",
+        "presencas": {
+            "07/05/2025": "Presente",
+            "08/05/2025 19:00": "Presente",
+            "08/05/2025 20:00": "Presente",
+            "09/05/2025 19:00": "Presente",
+            "09/05/2025 20:00": "Data Futura"
+        }
+    },
+    2029434: {  # Número de identificação do aluno
+        "nome": "NICHOLAS",
+        "sobrenome": "ADORNI DA SILVA",
         "presencas": {
             "07/05/2025": "Ausente",
             "08/05/2025 19:00": "Ausente",
@@ -78,17 +90,40 @@ async def init_db():
         print(f"Erro ao conectar ao Parse Server: {e}")
         return False
 
+# Função auxiliar para encontrar qualquer arquivo Excel no sistema
+def encontrar_excel():
+    """Procura por qualquer arquivo Excel no sistema"""
+    caminhos_a_verificar = [
+        "data/*.xlsx",       # Na pasta data/
+        "*.xlsx",            # Na raiz
+        "../data/*.xlsx",    # Um nível acima
+        "../../data/*.xlsx", # Dois níveis acima
+    ]
+    
+    for padrao in caminhos_a_verificar:
+        arquivos = glob.glob(padrao)
+        if arquivos:
+            print(f"Arquivos Excel encontrados com padrão {padrao}:")
+            for arquivo in arquivos:
+                print(f"  - {arquivo}")
+            return arquivos[0]  # Retorna o primeiro arquivo encontrado
+    
+    # Informações de debug
+    print("Nenhum arquivo Excel encontrado. Informações de depuração:")
+    print(f"Diretório atual: {os.getcwd()}")
+    print("Conteúdo do diretório atual:")
+    for item in os.listdir('.'):
+        print(f"  - {item}")
+    if os.path.exists('data'):
+        print("Conteúdo do diretório 'data':")
+        for item in os.listdir('data'):
+            print(f"  - {item}")
+    
+    return None
+
 # Função para carregar dados do Excel para o Parse Server
 async def carregar_excel():
     """Carrega dados do Excel para o Parse Server"""
-    # Caminhos possíveis para o arquivo Excel
-    caminhos = [
-        "data/Frequencia Hack.xlsx",       # No diretório data/
-        "Frequencia Hack.xlsx",            # Na raiz
-        "../data/Frequencia Hack.xlsx",    # Um nível acima
-        "../../data/Frequencia Hack.xlsx", # Dois níveis acima
-    ]
-    
     # Verificar se a classe já tem dados
     try:
         count = await contar_registros()
@@ -98,45 +133,48 @@ async def carregar_excel():
     except Exception as e:
         print(f"Erro ao verificar registros existentes: {e}")
     
-    # Tentar cada caminho possível
-    for caminho in caminhos:
-        if os.path.exists(caminho):
-            print(f"Arquivo Excel encontrado em: {caminho}")
-            try:
-                # Ler o arquivo Excel
-                df = pd.read_excel(caminho)
-                print(f"Total de registros encontrados no Excel: {len(df)}")
-                
-                # Processar dados para o Parse Server
-                registros = []
-                for i, row in df.iterrows():
-                    try:
-                        # Mapear dados do Excel para o Parse Server
-                        registro = {
-                            "id_estudante": int(row["ID do Estudante"]),
-                            "nome": str(row["Nome"]),
-                            "sobrenome": str(row["Sobrenome"]),
-                            "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
-                            "dia_07_05": int(row["7/05/2025"]) if pd.notna(row["7/05/2025"]) else 0,
-                            "dia_08_05_19h": int(row["8/05/2025 19:00 "]) if pd.notna(row["8/05/2025 19:00 "]) else 0,
-                            "dia_08_05_20h": int(row["8/05/2025 20:00"]) if pd.notna(row["8/05/2025 20:00"]) else 0,
-                            "dia_09_05_19h": int(row["9/05/2025 19:00 "]) if pd.notna(row["9/05/2025 19:00 "]) else 0,
-                            "dia_09_05_20h": int(row["9/05/2025 20:00"]) if pd.notna(row["9/05/2025 20:00"]) else 0
-                        }
-                        registros.append(registro)
-                    except Exception as e:
-                        print(f"Erro ao processar registro {i}: {e}")
-                
-                # Inserir registros no Parse Server
-                await inserir_registros(registros)
-                print(f"Importação concluída! {len(registros)} registros processados.")
-                return True
-                
-            except Exception as e:
-                print(f"Erro ao processar arquivo Excel {caminho}: {e}")
+    # Encontrar arquivo Excel
+    arquivo_excel = encontrar_excel()
     
-    # Se não encontrou o arquivo em nenhum caminho
-    print("Arquivo Excel não encontrado. Usando dados de exemplo.")
+    if arquivo_excel:
+        print(f"Arquivo Excel encontrado: {arquivo_excel}")
+        try:
+            # Ler o arquivo Excel
+            df = pd.read_excel(arquivo_excel)
+            print(f"Total de registros encontrados no Excel: {len(df)}")
+            print(f"Colunas encontradas: {df.columns.tolist()}")
+            
+            # Processar dados para o Parse Server
+            registros = []
+            for i, row in df.iterrows():
+                try:
+                    # ALTERAÇÃO: Mapear dados usando "Número de identificação" em vez de "ID do Estudante"
+                    registro = {
+                        "id_estudante": int(row["ID do Estudante"]),  # Mantemos para referência
+                        "numero_identificacao": int(row["Número de identificação"]),  # Nova chave principal
+                        "nome": str(row["Nome"]),
+                        "sobrenome": str(row["Sobrenome"]),
+                        "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
+                        "dia_07_05": int(row["7/05/2025"]) if pd.notna(row["7/05/2025"]) else 0,
+                        "dia_08_05_19h": int(row["8/05/2025 19:00 "]) if pd.notna(row["8/05/2025 19:00 "]) else 0,
+                        "dia_08_05_20h": int(row["8/05/2025 20:00"]) if pd.notna(row["8/05/2025 20:00"]) else 0,
+                        "dia_09_05_19h": int(row["9/05/2025 19:00 "]) if pd.notna(row["9/05/2025 19:00 "]) else 0,
+                        "dia_09_05_20h": int(row["9/05/2025 20:00"]) if pd.notna(row["9/05/2025 20:00"]) else 0
+                    }
+                    registros.append(registro)
+                except Exception as e:
+                    print(f"Erro ao processar registro {i}: {e}")
+            
+            # Inserir registros no Parse Server
+            await inserir_registros(registros)
+            print(f"Importação concluída! {len(registros)} registros processados.")
+            return True
+            
+        except Exception as e:
+            print(f"Erro ao processar arquivo Excel {arquivo_excel}: {e}")
+    
+    # Se não encontrou o arquivo ou houve erro
+    print("Arquivo Excel não encontrado ou erro ao processá-lo. Usando dados de exemplo.")
     
     # Inserir dados de exemplo
     await inserir_dados_exemplo()
@@ -197,9 +235,10 @@ async def inserir_dados_exemplo():
     print("Inserindo dados de exemplo no Parse Server...")
     
     registros = []
-    for id_estudante, aluno in DADOS_EXEMPLO.items():
+    for numero_id, aluno in DADOS_EXEMPLO.items():
         registro = {
-            "id_estudante": id_estudante,
+            "numero_identificacao": numero_id,  # ALTERAÇÃO: Usando número de identificação
+            "id_estudante": 0,  # Valor padrão já que não temos o ID do estudante nos dados de exemplo
             "nome": aluno["nome"],
             "sobrenome": aluno["sobrenome"],
             "dia_07_05": 1 if aluno["presencas"]["07/05/2025"] == "Presente" else 0,
@@ -213,11 +252,11 @@ async def inserir_dados_exemplo():
     await inserir_registros(registros)
     print(f"Inseridos {len(registros)} registros de exemplo.")
 
-# Função para buscar um aluno pelo ID
-async def buscar_aluno(id_estudante):
+# ALTERAÇÃO: Função para buscar um aluno pelo número de identificação
+async def buscar_aluno(numero_id):
     try:
-        # Construir a consulta no formato do Parse Server
-        where = {"id_estudante": id_estudante}
+        # Construir a consulta no formato do Parse Server usando número de identificação
+        where = {"numero_identificacao": numero_id}
         
         params = {
             "where": json.dumps(where),
@@ -251,9 +290,9 @@ async def buscar_aluno(id_estudante):
                     }
                 
             # Se não encontrar ou houver erro, verificar nos dados de exemplo
-            if id_estudante in DADOS_EXEMPLO:
-                print(f"Aluno {id_estudante} encontrado nos dados de exemplo.")
-                return DADOS_EXEMPLO[id_estudante]
+            if numero_id in DADOS_EXEMPLO:
+                print(f"Aluno com número de identificação {numero_id} encontrado nos dados de exemplo.")
+                return DADOS_EXEMPLO[numero_id]
                 
             return None
                 
@@ -261,8 +300,8 @@ async def buscar_aluno(id_estudante):
         print(f"Erro ao buscar aluno: {e}")
         
         # Em caso de erro, tentar buscar nos dados de exemplo
-        if id_estudante in DADOS_EXEMPLO:
-            print(f"Aluno {id_estudante} encontrado nos dados de exemplo (após erro).")
-            return DADOS_EXEMPLO[id_estudante]
+        if numero_id in DADOS_EXEMPLO:
+            print(f"Aluno com número de identificação {numero_id} encontrado nos dados de exemplo (após erro).")
+            return DADOS_EXEMPLO[numero_id]
             
         return None
