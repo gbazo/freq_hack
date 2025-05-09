@@ -1,6 +1,7 @@
 import os
 import httpx
 import json
+import pandas as pd
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente
@@ -22,6 +23,7 @@ PARSE_HEADERS = {
 PRESENCA_CLASS = "Presenca"
 
 # Dados em memória para backup (caso o Parse Server não esteja disponível)
+# Atualizado para refletir o dia atual (09/05)
 DADOS_EXEMPLO = {
     12345: {
         "nome": "ESTUDANTE",
@@ -30,7 +32,7 @@ DADOS_EXEMPLO = {
             "07/05/2025": "Presente",
             "08/05/2025 19:00": "Presente",
             "08/05/2025 20:00": "Presente",
-            "09/05/2025 19:00": "Data Futura",
+            "09/05/2025 19:00": "Presente",
             "09/05/2025 20:00": "Data Futura"
         }
     },
@@ -41,7 +43,7 @@ DADOS_EXEMPLO = {
             "07/05/2025": "Ausente",
             "08/05/2025 19:00": "Ausente",
             "08/05/2025 20:00": "Ausente",
-            "09/05/2025 19:00": "Data Futura",
+            "09/05/2025 19:00": "Ausente",
             "09/05/2025 20:00": "Data Futura"
         }
     }
@@ -76,50 +78,140 @@ async def init_db():
         print(f"Erro ao conectar ao Parse Server: {e}")
         return False
 
-# Função para verificar se a classe Presenca existe ou criar se não existir
-async def ensure_presenca_class():
+# Função para carregar dados do Excel para o Parse Server
+async def carregar_excel():
+    """Carrega dados do Excel para o Parse Server"""
+    # Caminhos possíveis para o arquivo Excel
+    caminhos = [
+        "data/Frequencia Hack.xlsx",       # No diretório data/
+        "Frequencia Hack.xlsx",            # Na raiz
+        "../data/Frequencia Hack.xlsx",    # Um nível acima
+        "../../data/Frequencia Hack.xlsx", # Dois níveis acima
+    ]
+    
+    # Verificar se a classe já tem dados
     try:
-        # Primeiro, verificar se a classe já existe
+        count = await contar_registros()
+        if count > 0:
+            print(f"Já existem {count} registros no Parse Server. Pulando importação.")
+            return True
+    except Exception as e:
+        print(f"Erro ao verificar registros existentes: {e}")
+    
+    # Tentar cada caminho possível
+    for caminho in caminhos:
+        if os.path.exists(caminho):
+            print(f"Arquivo Excel encontrado em: {caminho}")
+            try:
+                # Ler o arquivo Excel
+                df = pd.read_excel(caminho)
+                print(f"Total de registros encontrados no Excel: {len(df)}")
+                
+                # Processar dados para o Parse Server
+                registros = []
+                for i, row in df.iterrows():
+                    try:
+                        # Mapear dados do Excel para o Parse Server
+                        registro = {
+                            "id_estudante": int(row["ID do Estudante"]),
+                            "nome": str(row["Nome"]),
+                            "sobrenome": str(row["Sobrenome"]),
+                            "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
+                            "dia_07_05": int(row["7/05/2025"]) if pd.notna(row["7/05/2025"]) else 0,
+                            "dia_08_05_19h": int(row["8/05/2025 19:00 "]) if pd.notna(row["8/05/2025 19:00 "]) else 0,
+                            "dia_08_05_20h": int(row["8/05/2025 20:00"]) if pd.notna(row["8/05/2025 20:00"]) else 0,
+                            "dia_09_05_19h": int(row["9/05/2025 19:00 "]) if pd.notna(row["9/05/2025 19:00 "]) else 0,
+                            "dia_09_05_20h": int(row["9/05/2025 20:00"]) if pd.notna(row["9/05/2025 20:00"]) else 0
+                        }
+                        registros.append(registro)
+                    except Exception as e:
+                        print(f"Erro ao processar registro {i}: {e}")
+                
+                # Inserir registros no Parse Server
+                await inserir_registros(registros)
+                print(f"Importação concluída! {len(registros)} registros processados.")
+                return True
+                
+            except Exception as e:
+                print(f"Erro ao processar arquivo Excel {caminho}: {e}")
+    
+    # Se não encontrou o arquivo em nenhum caminho
+    print("Arquivo Excel não encontrado. Usando dados de exemplo.")
+    
+    # Inserir dados de exemplo
+    await inserir_dados_exemplo()
+    return False
+
+# Função para contar registros no Parse Server
+async def contar_registros():
+    """Conta quantos registros existem na classe Presenca"""
+    try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{PARSE_SERVER_URL}/schemas/{PRESENCA_CLASS}",
-                headers=PARSE_HEADERS
+                f"{PARSE_SERVER_URL}/classes/{PRESENCA_CLASS}",
+                headers=PARSE_HEADERS,
+                params={"count": 1, "limit": 0}
             )
             
-            # Se a classe não existir, criar com alguns dados de exemplo
-            if response.status_code == 404:
-                print(f"Classe {PRESENCA_CLASS} não encontrada. Criando com dados de exemplo...")
-                
-                # Inserir dados de exemplo
-                for id_estudante, aluno in DADOS_EXEMPLO.items():
-                    # Converter para o formato correto do Parse Server
-                    document = {
-                        "id_estudante": id_estudante,
-                        "nome": aluno["nome"],
-                        "sobrenome": aluno["sobrenome"],
-                        "dia_07_05": 1 if aluno["presencas"]["07/05/2025"] == "Presente" else 0,
-                        "dia_08_05_19h": 1 if aluno["presencas"]["08/05/2025 19:00"] == "Presente" else 0,
-                        "dia_08_05_20h": 1 if aluno["presencas"]["08/05/2025 20:00"] == "Presente" else 0,
-                        "dia_09_05_19h": 2,  # Data futura
-                        "dia_09_05_20h": 2   # Data futura
-                    }
-                    
-                    # Inserir no Parse Server
-                    create_response = await client.post(
+            if response.status_code == 200:
+                return response.json().get("count", 0)
+            else:
+                print(f"Erro ao contar registros: {response.status_code} {response.text}")
+                return 0
+    except Exception as e:
+        print(f"Erro ao contar registros: {e}")
+        return 0
+
+# Função para inserir registros no Parse Server
+async def inserir_registros(registros):
+    """Insere registros no Parse Server"""
+    if not registros:
+        print("Nenhum registro para inserir.")
+        return
+    
+    print(f"Inserindo {len(registros)} registros no Parse Server...")
+    
+    async with httpx.AsyncClient() as client:
+        # Inserir em lotes para não sobrecarregar a API
+        batch_size = 50
+        for i in range(0, len(registros), batch_size):
+            batch = registros[i:i+batch_size]
+            print(f"Processando lote de {len(batch)} registros...")
+            
+            for registro in batch:
+                try:
+                    response = await client.post(
                         f"{PARSE_SERVER_URL}/classes/{PRESENCA_CLASS}",
                         headers=PARSE_HEADERS,
-                        json=document
+                        json=registro
                     )
                     
-                    if create_response.status_code == 201:
-                        print(f"Registro para ID {id_estudante} criado com sucesso!")
-                    else:
-                        print(f"Erro ao criar registro: {create_response.status_code} {create_response.text}")
-            else:
-                print(f"Classe {PRESENCA_CLASS} já existe no Parse Server.")
-                
-    except Exception as e:
-        print(f"Erro ao verificar ou criar classe: {e}")
+                    if response.status_code != 201:
+                        print(f"Erro ao inserir registro: {response.status_code} {response.text}")
+                except Exception as e:
+                    print(f"Exceção ao inserir registro: {e}")
+
+# Função para inserir dados de exemplo
+async def inserir_dados_exemplo():
+    """Insere dados de exemplo no Parse Server"""
+    print("Inserindo dados de exemplo no Parse Server...")
+    
+    registros = []
+    for id_estudante, aluno in DADOS_EXEMPLO.items():
+        registro = {
+            "id_estudante": id_estudante,
+            "nome": aluno["nome"],
+            "sobrenome": aluno["sobrenome"],
+            "dia_07_05": 1 if aluno["presencas"]["07/05/2025"] == "Presente" else 0,
+            "dia_08_05_19h": 1 if aluno["presencas"]["08/05/2025 19:00"] == "Presente" else 0,
+            "dia_08_05_20h": 1 if aluno["presencas"]["08/05/2025 20:00"] == "Presente" else 0,
+            "dia_09_05_19h": 1 if aluno["presencas"]["09/05/2025 19:00"] == "Presente" else 0,
+            "dia_09_05_20h": 2  # Data futura
+        }
+        registros.append(registro)
+    
+    await inserir_registros(registros)
+    print(f"Inseridos {len(registros)} registros de exemplo.")
 
 # Função para buscar um aluno pelo ID
 async def buscar_aluno(id_estudante):
@@ -148,7 +240,7 @@ async def buscar_aluno(id_estudante):
                         "07/05/2025": STATUS_MAP[aluno.get("dia_07_05", 0)],
                         "08/05/2025 19:00": STATUS_MAP[aluno.get("dia_08_05_19h", 0)],
                         "08/05/2025 20:00": STATUS_MAP[aluno.get("dia_08_05_20h", 0)],
-                        "09/05/2025 19:00": STATUS_MAP[aluno.get("dia_09_05_19h", 2)],
+                        "09/05/2025 19:00": STATUS_MAP[aluno.get("dia_09_05_19h", 0)],
                         "09/05/2025 20:00": STATUS_MAP[aluno.get("dia_09_05_20h", 2)]
                     }
                     
