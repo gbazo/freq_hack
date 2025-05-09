@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ titulo }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Consulta presença QR Code Hack Barão 2025</h1>
+            
+            <form action="/consultar" method="post">
+                <div class="form-group">
+                    <label for="codigo">Digite seu código de aluno:</label>
+                    <input type="text" id="codigo" name="codigo" required placeholder="Ex: 12345">
+                </div>
+                
+                <button type="submit" class="btn-consultar">Consultar</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', path='/script.js') }}"></script>
+</body>
+</html>

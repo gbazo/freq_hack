@@ -1,0 +1,80 @@
+# Arquivos e diretórios Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Ambientes virtuais
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.env
+
+# IDEs e editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings
+
+# Arquivos de configuração local
+*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de dados
+# Permite que arquivos Excel sejam incluídos no repositório
+# data/*.xlsx
+data/*.csv
+*.sqlite3
+*.db
+
+# Docker
+# .dockerignore
+docker-compose.override.yml
+
+# Outros
+.DS_Store
+Thumbs.db
+.coverage
+htmlcov/
+.pytest_cache/
+pytest-report.xml
+coverage.xml
+*.cover
+
+# Bin, Include e pyvenv.cfg (parte do ambiente virtual)
+bin/
+include/
+pyvenv.cfg

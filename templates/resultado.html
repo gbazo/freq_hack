@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ titulo }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="card resultado">
+            <h1>Resultado da Consulta</h1>
+            
+            {% if encontrado %}
+                <div class="aluno-info">
+                    <h2>{{ nome }}</h2>
+                    
+                    <h3>Registro de Presenças</h3>
+                    <table class="tabela-presenca">
+                        <thead>
+                            <tr>
+                                <th>Data/Horário</th>
+                                <th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for data, status in presencas.items() %}
+                            <tr class="status-{{ status|lower|replace(' ', '-') }}">
+                                <td>{{ data }}</td>
+                                <td>{{ status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="mensagem-erro">
+                    <p>{{ mensagem }}</p>
+                </div>
+            {% endif %}
+            
+            <a href="/" class="btn-voltar">Voltar</a>
+        </div>
+    </div>
+</body>
+</html>
