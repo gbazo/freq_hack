@@ -45,10 +45,10 @@ async def importar_excel(arquivo_excel):
         registros = []
         for i, row in df.iterrows():
             try:
-                # Mapear dados do Excel para o Parse Server
-                # Ajuste os nomes das colunas conforme seu arquivo Excel
+                # ALTERAÇÃO: Mapear dados usando "Número de identificação" em vez de "ID do Estudante"
                 registro = {
-                    "id_estudante": int(row["ID do Estudante"]),
+                    "id_estudante": int(row["ID do Estudante"]),  # Mantemos para referência
+                    "numero_identificacao": int(row["Número de identificação"]),  # Nova chave principal
                     "nome": str(row["Nome"]),
                     "sobrenome": str(row["Sobrenome"]),
                     "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
