@@ -81,6 +81,25 @@ input[type="text"]:focus {
     background-color: #2980b9;
 }
 
+/* Texto informativo */
+.info-text {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #3498db;
+    color: #666;
+    font-size: 0.9rem;
+    border-radius: 4px;
+}
+
+.info-text p {
+    margin: 0;
+}
+
+.info-text strong {
+    color: #3498db;
+}
+
 /* Estilos da página de resultado */
 .resultado {
     max-width: 600px;
