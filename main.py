@@ -31,11 +31,11 @@ async def index(request: Request):
 @app.post("/consultar", response_class=HTMLResponse)
 async def consultar(request: Request, codigo: str = Form(...)):
     try:
-        # Converter código para inteiro
-        id_estudante = int(codigo)
+        # Converter código para inteiro - agora é o número de identificação
+        numero_id = int(codigo)
         
-        # Buscar dados de presença
-        aluno = await database.buscar_aluno(id_estudante)
+        # Buscar dados de presença pelo número de identificação
+        aluno = await database.buscar_aluno(numero_id)
         
         if aluno:
             return templates.TemplateResponse(
@@ -102,6 +102,44 @@ async def load_excel():
         return {
             "status": "success",
             "message": "Dados do Excel carregados com sucesso" if result else "Arquivo Excel não encontrado, usando dados de exemplo"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Rota para limpar os dados e recarregar do Excel
+@app.get("/reload-excel")
+async def reload_excel():
+    try:
+        # Importar a função diretamente do módulo
+        import import_excel
+        
+        # Executar limpeza e importação
+        caminhos = [
+            "data/Frequencia Hack.xlsx",
+            "Frequencia Hack.xlsx",
+            "../data/Frequencia Hack.xlsx",
+            "../../data/Frequencia Hack.xlsx",
+        ]
+        
+        # Tentar cada caminho possível
+        for caminho in caminhos:
+            if os.path.exists(caminho):
+                print(f"Arquivo encontrado em: {caminho}")
+                sucesso = await import_excel.importar_excel(caminho)
+                if sucesso:
+                    return {
+                        "status": "success",
+                        "message": f"Dados importados com sucesso do arquivo: {caminho}"
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": f"Falha ao importar dados do arquivo: {caminho}"
+                    }
+        
+        return {
+            "status": "error",
+            "message": "Arquivo Excel não encontrado em nenhum dos caminhos verificados"
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
