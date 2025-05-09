@@ -15,5 +15,11 @@ COPY .dockerignore ./
 # Criar pasta de dados se não existir
 RUN mkdir -p data
 
-# Comando para executar o aplicativo
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Environment variable for the port
+ENV PORT=8000
+
+# Command to run the application
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
