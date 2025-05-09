@@ -16,8 +16,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def startup_db_client():
     # Inicializar conexão com o Parse Server
     if await database.init_db():
-        # Se a conexão for bem-sucedida, garantir que a classe Presenca existe
-        await database.ensure_presenca_class()
+        # Se a conexão for bem-sucedida, carregar dados do Excel
+        await database.carregar_excel()
 
 # Rota principal - página inicial
 @app.get("/", response_class=HTMLResponse)
@@ -91,5 +91,17 @@ async def test_parse():
         # Inicializar conexão com o Parse Server
         result = await database.init_db()
         return {"status": "success" if result else "error", "connected": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Rota para forçar o carregamento do Excel
+@app.get("/load-excel")
+async def load_excel():
+    try:
+        result = await database.carregar_excel()
+        return {
+            "status": "success",
+            "message": "Dados do Excel carregados com sucesso" if result else "Arquivo Excel não encontrado, usando dados de exemplo"
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
