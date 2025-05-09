@@ -3,6 +3,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import database
+import os
+import import_excel
+import asyncio
 
 # Inicializar o aplicativo FastAPI
 app = FastAPI(title="Consulta Presença QR Code Hack Barão 2025")
@@ -90,7 +93,12 @@ async def test_parse():
     try:
         # Inicializar conexão com o Parse Server
         result = await database.init_db()
-        return {"status": "success" if result else "error", "connected": result}
+        count = await database.contar_registros()
+        return {
+            "status": "success" if result else "error", 
+            "connected": result,
+            "record_count": count
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -99,21 +107,20 @@ async def test_parse():
 async def load_excel():
     try:
         result = await database.carregar_excel()
+        count = await database.contar_registros()
         return {
             "status": "success",
-            "message": "Dados do Excel carregados com sucesso" if result else "Arquivo Excel não encontrado, usando dados de exemplo"
+            "message": "Dados do Excel carregados com sucesso" if result else "Arquivo Excel não encontrado, usando dados de exemplo",
+            "record_count": count
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 # Rota para limpar os dados e recarregar do Excel
-@app.get("/reload-excel")
-async def reload_excel():
+@app.get("/force-reload")
+async def force_reload():
     try:
-        # Importar a função diretamente do módulo
-        import import_excel
-        
-        # Executar limpeza e importação
+        # Caminhos possíveis para o arquivo Excel
         caminhos = [
             "data/Frequencia Hack.xlsx",
             "Frequencia Hack.xlsx",
@@ -121,25 +128,48 @@ async def reload_excel():
             "../../data/Frequencia Hack.xlsx",
         ]
         
-        # Tentar cada caminho possível
+        # Informações de debug
+        file_info = {
+            "current_dir": os.getcwd(),
+            "current_dir_contents": os.listdir('.'),
+            "data_dir_exists": os.path.exists('data'),
+            "data_dir_contents": os.listdir('data') if os.path.exists('data') else [],
+            "paths_checked": []
+        }
+        
+        # Verificar cada caminho
         for caminho in caminhos:
+            file_info["paths_checked"].append({
+                "path": caminho,
+                "exists": os.path.exists(caminho)
+            })
+            
             if os.path.exists(caminho):
-                print(f"Arquivo encontrado em: {caminho}")
-                sucesso = await import_excel.importar_excel(caminho)
-                if sucesso:
-                    return {
-                        "status": "success",
-                        "message": f"Dados importados com sucesso do arquivo: {caminho}"
-                    }
-                else:
-                    return {
-                        "status": "error",
-                        "message": f"Falha ao importar dados do arquivo: {caminho}"
-                    }
+                # Aqui, executamos o script de importação diretamente
+                asyncio.create_task(import_excel.importar_excel(caminho))
+                return {
+                    "status": "success",
+                    "message": f"Importação iniciada em segundo plano do arquivo: {caminho}",
+                    "file_info": file_info
+                }
         
         return {
             "status": "error",
-            "message": "Arquivo Excel não encontrado em nenhum dos caminhos verificados"
+            "message": "Arquivo Excel não encontrado em nenhum dos caminhos verificados",
+            "file_info": file_info
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Nova rota para mostrar todos os registros no Parse Server
+@app.get("/list-records")
+async def list_records():
+    try:
+        registros = await database.listar_registros()
+        return {
+            "status": "success",
+            "record_count": len(registros),
+            "records": registros
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
