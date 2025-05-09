@@ -41,28 +41,16 @@ async def importar_excel(arquivo_excel):
         # Verificar as colunas do DataFrame
         print("Colunas encontradas:", df.columns.tolist())
         
-        # Coluna necessária "Número de identificação"
-        if "Número de identificação" not in df.columns:
-            print("ERRO: Coluna 'Número de identificação' não encontrada no Excel")
-            print("Colunas disponíveis:", df.columns.tolist())
-            return False
-        
         # Processar dados para o Parse Server
         registros = []
-        errors = 0
         for i, row in df.iterrows():
             try:
-                # Verificar se o número de identificação é válido
-                if pd.isna(row["Número de identificação"]):
-                    print(f"Aviso: Registro {i} pulado - Número de identificação vazio")
-                    continue
-                
-                # ALTERAÇÃO: Mapear dados usando "Número de identificação" em vez de "ID do Estudante"
+                # Mapear dados do Excel para o Parse Server
+                # Ajuste os nomes das colunas conforme seu arquivo Excel
                 registro = {
-                    "id_estudante": int(row["ID do Estudante"]) if pd.notna(row["ID do Estudante"]) else 0,
-                    "numero_identificacao": int(row["Número de identificação"]),
-                    "nome": str(row["Nome"]) if pd.notna(row["Nome"]) else "",
-                    "sobrenome": str(row["Sobrenome"]) if pd.notna(row["Sobrenome"]) else "",
+                    "id_estudante": int(row["ID do Estudante"]),
+                    "nome": str(row["Nome"]),
+                    "sobrenome": str(row["Sobrenome"]),
                     "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
                     "dia_07_05": int(row["7/05/2025"]) if pd.notna(row["7/05/2025"]) else 0,
                     "dia_08_05_19h": int(row["8/05/2025 19:00 "]) if pd.notna(row["8/05/2025 19:00 "]) else 0,
@@ -74,24 +62,13 @@ async def importar_excel(arquivo_excel):
                 if i % 100 == 0:
                     print(f"Processados {i+1} registros...")
             except Exception as e:
-                errors += 1
                 print(f"Erro ao processar registro {i}: {e}")
-                # Mostrar os dados da linha para depuração
-                print("Dados da linha:")
-                for col, val in row.items():
-                    print(f"  - {col}: {val} (tipo: {type(val)})")
+                print(f"Dados da linha: {row.to_dict()}")
         
-        if errors > 0:
-            print(f"ATENÇÃO: {errors} registros com erro ao processar")
-        
-        print(f"Total de registros processados com sucesso: {len(registros)}")
-        
-        if len(registros) == 0:
-            print("ERRO: Nenhum registro válido encontrado no Excel")
-            return False
+        print(f"Total de registros processados: {len(registros)}")
         
         # Enviar dados para o Parse Server
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             # Primeiro, limpar a classe existente
             print("Verificando se a classe já existe...")
             try:
@@ -116,7 +93,6 @@ async def importar_excel(arquivo_excel):
                         print(f"Encontrados {len(objects)} registros a serem removidos")
                         
                         # Remover cada registro
-                        delete_errors = 0
                         for obj in objects:
                             object_id = obj.get("objectId")
                             delete_response = await client.delete(
@@ -125,34 +101,27 @@ async def importar_excel(arquivo_excel):
                             )
                             
                             if delete_response.status_code != 200:
-                                delete_errors += 1
                                 print(f"Erro ao remover registro {object_id}: {delete_response.status_code}")
                         
-                        if delete_errors > 0:
-                            print(f"ATENÇÃO: {delete_errors} registros não foram removidos")
-                        else:
-                            print("Registros removidos com sucesso!")
+                        print("Registros removidos com sucesso!")
                     else:
                         print(f"Erro ao obter registros existentes: {all_objects_response.status_code}")
-                        print(all_objects_response.text)
                 else:
                     print(f"Classe não encontrada ou erro ao verificar: {response.status_code}")
-                    print(response.text)
             except Exception as e:
                 print(f"Erro ao limpar registros existentes: {e}")
             
             # Inserir novos registros
             print("Inserindo novos registros...")
             inserted = 0
-            insert_errors = 0
+            errors = 0
             
             # Inserir em lotes de 50 para não sobrecarregar a API
-            batch_size = 20  # Reduzido para evitar problemas de timeout
+            batch_size = 50
             for i in range(0, len(registros), batch_size):
                 batch = registros[i:i+batch_size]
                 print(f"Processando lote de {len(batch)} registros ({i+1} a {i+len(batch)} de {len(registros)})...")
                 
-                # Vamos inserir um registro por vez para facilitar diagnóstico
                 for registro in batch:
                     try:
                         response = await client.post(
@@ -166,21 +135,17 @@ async def importar_excel(arquivo_excel):
                             if inserted % 20 == 0:
                                 print(f"Inseridos {inserted} registros...")
                         else:
-                            insert_errors += 1
+                            errors += 1
                             print(f"Erro ao inserir registro: {response.status_code} {response.text}")
-                            print(f"Dados do registro: {registro}")
                     except Exception as e:
-                        insert_errors += 1
+                        errors += 1
                         print(f"Exceção ao inserir registro: {e}")
-                        print(f"Dados do registro: {registro}")
             
-            print(f"Importação concluída! Inseridos {inserted} registros, {insert_errors} erros.")
-            return inserted > 0
+            print(f"Importação concluída! Inseridos {inserted} registros, {errors} erros.")
+            return True
             
     except Exception as e:
         print(f"Erro durante a importação: {e}")
-        import traceback
-        traceback.print_exc()
         return False
 
 # Função principal
@@ -193,19 +158,8 @@ async def main():
         "../../data/Frequencia Hack.xlsx", # Dois níveis acima
     ]
     
-    # Mostrar informações de debug
-    print("Diretório atual:", os.getcwd())
-    print("Conteúdo do diretório atual:")
-    for item in os.listdir('.'):
-        print(f"  - {item}")
-    if os.path.exists('data'):
-        print("Conteúdo do diretório 'data':")
-        for item in os.listdir('data'):
-            print(f"  - {item}")
-    
     # Tentar cada caminho possível
     for caminho in caminhos:
-        print(f"Verificando caminho: {caminho} (existe: {os.path.exists(caminho)})")
         if os.path.exists(caminho):
             print(f"Arquivo encontrado em: {caminho}")
             sucesso = await importar_excel(caminho)
@@ -219,6 +173,10 @@ async def main():
         print("Caminhos verificados:")
         for caminho in caminhos:
             print(f"  - {caminho}")
+        print("Diretório atual:", os.getcwd())
+        print("Conteúdo do diretório atual:", os.listdir("."))
+        if os.path.exists("data"):
+            print("Conteúdo do diretório 'data':", os.listdir("data"))
 
 # Executar o script
 if __name__ == "__main__":
