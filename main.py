@@ -88,3 +88,13 @@ async def consultar(request: Request, codigo: str = Form(...)):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# ============================
+# INÍCIO DO SERVIDOR
+# ============================
+
+if __name__ == "__main__":
+    import uvicorn
+    # Obter porta do ambiente ou usar 8000 como padrão
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
