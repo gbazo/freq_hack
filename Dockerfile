@@ -15,9 +15,9 @@ COPY .dockerignore ./
 # Criar pasta de dados
 RUN mkdir -p data
 
-# Copiar o arquivo Excel (se existir)
-COPY data/*.xlsx data/ 2>/dev/null || true
-COPY *.xlsx ./ 2>/dev/null || true
+# Copiar opcionalmente o diretório data, se existir
+# (Docker ignorará silenciosamente se o diretório não existir)
+COPY data ./data/
 
 # Expose the port the app runs on
 EXPOSE 8000
