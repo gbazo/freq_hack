@@ -12,8 +12,12 @@ COPY static ./static
 COPY templates ./templates
 COPY .dockerignore ./
 
-# Criar pasta de dados se não existir
+# Criar pasta de dados
 RUN mkdir -p data
+
+# Copiar o arquivo Excel (se existir)
+COPY data/*.xlsx data/ 2>/dev/null || true
+COPY *.xlsx ./ 2>/dev/null || true
 
 # Expose the port the app runs on
 EXPOSE 8000
