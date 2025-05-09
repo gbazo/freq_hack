@@ -21,6 +21,35 @@ PARSE_HEADERS = {
 # Nome da classe no Parse Server
 PRESENCA_CLASS = "Presenca"
 
+# Função para testar a conexão com o Parse Server
+async def test_connection():
+    """Função para testar a conexão com o Parse Server"""
+    try:
+        async with httpx.AsyncClient() as client:
+            # Tentar listar as classes
+            response = await client.get(
+                f"{PARSE_SERVER_URL}/schemas", 
+                headers=PARSE_HEADERS
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "message": "Conexão com Parse Server bem-sucedida",
+                    "schemas": response.json(),
+                    "config": {
+                        "PARSE_SERVER_URL": PARSE_SERVER_URL,
+                        "PARSE_APP_ID": PARSE_APP_ID[:5] + "..." if PARSE_APP_ID else None,
+                        "PARSE_CLASS": PRESENCA_CLASS
+                    }
+                }
+            else:
+                return {
+                    "message": f"Erro ao conectar: {response.status_code}",
+                    "response": response.text
+                }
+    except Exception as e:
+        return {"error": str(e)}
+
 # Função para inicializar o banco de dados
 async def init_db():
     try:
