@@ -24,11 +24,11 @@ PARSE_HEADERS = {
 PRESENCA_CLASS = "Presenca"
 
 # Dados em memória para backup (caso o Parse Server não esteja disponível)
-# IMPORTANTE: Agora usando "numero_identificacao" em vez de "id_estudante"
+# Atualizado para refletir o dia atual (09/05)
 DADOS_EXEMPLO = {
-    1984957: {  # Número de identificação do aluno
-        "nome": "LEANDRO",
-        "sobrenome": "AUGUSTO ESTEVAM CRISTINA",
+    12345: {
+        "nome": "ESTUDANTE",
+        "sobrenome": "TESTE",
         "presencas": {
             "07/05/2025": "Presente",
             "08/05/2025 19:00": "Presente",
@@ -37,20 +37,9 @@ DADOS_EXEMPLO = {
             "09/05/2025 20:00": "Data Futura"
         }
     },
-    2165351: {  # Número de identificação do aluno
-        "nome": "LUCCAS",
-        "sobrenome": "ADELINO JORDÃO DA SILVA",
-        "presencas": {
-            "07/05/2025": "Presente",
-            "08/05/2025 19:00": "Presente",
-            "08/05/2025 20:00": "Presente",
-            "09/05/2025 19:00": "Presente",
-            "09/05/2025 20:00": "Data Futura"
-        }
-    },
-    2029434: {  # Número de identificação do aluno
-        "nome": "NICHOLAS",
-        "sobrenome": "ADORNI DA SILVA",
+    54321: {
+        "nome": "ALUNO",
+        "sobrenome": "EXEMPLO",
         "presencas": {
             "07/05/2025": "Ausente",
             "08/05/2025 19:00": "Ausente",
@@ -148,10 +137,9 @@ async def carregar_excel():
             registros = []
             for i, row in df.iterrows():
                 try:
-                    # ALTERAÇÃO: Mapear dados usando "Número de identificação" em vez de "ID do Estudante"
+                    # Mapear dados do Excel para o Parse Server
                     registro = {
-                        "id_estudante": int(row["ID do Estudante"]),  # Mantemos para referência
-                        "numero_identificacao": int(row["Número de identificação"]),  # Nova chave principal
+                        "id_estudante": int(row["ID do Estudante"]),
                         "nome": str(row["Nome"]),
                         "sobrenome": str(row["Sobrenome"]),
                         "email": str(row["Endereço de email"]) if pd.notna(row["Endereço de email"]) else "",
@@ -200,36 +188,6 @@ async def contar_registros():
         print(f"Erro ao contar registros: {e}")
         return 0
 
-# Nova função para listar registros no Parse Server
-async def listar_registros():
-    """Lista todos os registros na classe Presenca"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{PARSE_SERVER_URL}/classes/{PRESENCA_CLASS}",
-                headers=PARSE_HEADERS,
-                params={"limit": 1000}  # Limite de 1000 registros
-            )
-            
-            if response.status_code == 200:
-                results = response.json().get("results", [])
-                # Formatar os resultados para mostrar apenas informações essenciais
-                registros_formatados = []
-                for r in results:
-                    registros_formatados.append({
-                        "id": r.get("objectId"),
-                        "numero_identificacao": r.get("numero_identificacao"),
-                        "nome": r.get("nome"),
-                        "sobrenome": r.get("sobrenome")
-                    })
-                return registros_formatados
-            else:
-                print(f"Erro ao listar registros: {response.status_code} {response.text}")
-                return []
-    except Exception as e:
-        print(f"Erro ao listar registros: {e}")
-        return []
-
 # Função para inserir registros no Parse Server
 async def inserir_registros(registros):
     """Insere registros no Parse Server"""
@@ -265,10 +223,9 @@ async def inserir_dados_exemplo():
     print("Inserindo dados de exemplo no Parse Server...")
     
     registros = []
-    for numero_id, aluno in DADOS_EXEMPLO.items():
+    for id_estudante, aluno in DADOS_EXEMPLO.items():
         registro = {
-            "numero_identificacao": numero_id,  # ALTERAÇÃO: Usando número de identificação
-            "id_estudante": 0,  # Valor padrão já que não temos o ID do estudante nos dados de exemplo
+            "id_estudante": id_estudante,
             "nome": aluno["nome"],
             "sobrenome": aluno["sobrenome"],
             "dia_07_05": 1 if aluno["presencas"]["07/05/2025"] == "Presente" else 0,
@@ -282,11 +239,11 @@ async def inserir_dados_exemplo():
     await inserir_registros(registros)
     print(f"Inseridos {len(registros)} registros de exemplo.")
 
-# ALTERAÇÃO: Função para buscar um aluno pelo número de identificação
-async def buscar_aluno(numero_id):
+# Função para buscar um aluno pelo ID
+async def buscar_aluno(id_estudante):
     try:
-        # Construir a consulta no formato do Parse Server usando número de identificação
-        where = {"numero_identificacao": numero_id}
+        # Construir a consulta no formato do Parse Server
+        where = {"id_estudante": id_estudante}
         
         params = {
             "where": json.dumps(where),
@@ -320,9 +277,9 @@ async def buscar_aluno(numero_id):
                     }
                 
             # Se não encontrar ou houver erro, verificar nos dados de exemplo
-            if numero_id in DADOS_EXEMPLO:
-                print(f"Aluno com número de identificação {numero_id} encontrado nos dados de exemplo.")
-                return DADOS_EXEMPLO[numero_id]
+            if id_estudante in DADOS_EXEMPLO:
+                print(f"Aluno {id_estudante} encontrado nos dados de exemplo.")
+                return DADOS_EXEMPLO[id_estudante]
                 
             return None
                 
@@ -330,8 +287,8 @@ async def buscar_aluno(numero_id):
         print(f"Erro ao buscar aluno: {e}")
         
         # Em caso de erro, tentar buscar nos dados de exemplo
-        if numero_id in DADOS_EXEMPLO:
-            print(f"Aluno com número de identificação {numero_id} encontrado nos dados de exemplo (após erro).")
-            return DADOS_EXEMPLO[numero_id]
+        if id_estudante in DADOS_EXEMPLO:
+            print(f"Aluno {id_estudante} encontrado nos dados de exemplo (após erro).")
+            return DADOS_EXEMPLO[id_estudante]
             
         return None
