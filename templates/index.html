@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ titulo }}</title>
-    <!-- Use uma URL relativa sem o esquema (http/https) -->
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
-    <!-- Adicione a meta tag para segurança -->
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <!-- Use links absolutos sem protocolo -->
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Adicionar meta tags para evitar caching -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 </head>
 <body>
     <div class="container">
@@ -25,7 +27,7 @@
         </div>
     </div>
     
-    <!-- Use uma URL relativa sem o esquema (http/https) -->
-    <script src="{{ url_for('static', path='/script.js') }}"></script>
+    <!-- Use links absolutos sem protocolo -->
+    <script src="/static/script.js"></script>
 </body>
 </html>
