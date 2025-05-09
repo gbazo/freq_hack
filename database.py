@@ -200,6 +200,36 @@ async def contar_registros():
         print(f"Erro ao contar registros: {e}")
         return 0
 
+# Nova função para listar registros no Parse Server
+async def listar_registros():
+    """Lista todos os registros na classe Presenca"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{PARSE_SERVER_URL}/classes/{PRESENCA_CLASS}",
+                headers=PARSE_HEADERS,
+                params={"limit": 1000}  # Limite de 1000 registros
+            )
+            
+            if response.status_code == 200:
+                results = response.json().get("results", [])
+                # Formatar os resultados para mostrar apenas informações essenciais
+                registros_formatados = []
+                for r in results:
+                    registros_formatados.append({
+                        "id": r.get("objectId"),
+                        "numero_identificacao": r.get("numero_identificacao"),
+                        "nome": r.get("nome"),
+                        "sobrenome": r.get("sobrenome")
+                    })
+                return registros_formatados
+            else:
+                print(f"Erro ao listar registros: {response.status_code} {response.text}")
+                return []
+    except Exception as e:
+        print(f"Erro ao listar registros: {e}")
+        return []
+
 # Função para inserir registros no Parse Server
 async def inserir_registros(registros):
     """Insere registros no Parse Server"""
