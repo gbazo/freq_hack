@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+import database
 
 # Inicializar o aplicativo FastAPI
 app = FastAPI(title="Consulta Presença QR Code Hack Barão 2025")
@@ -10,31 +11,13 @@ app = FastAPI(title="Consulta Presença QR Code Hack Barão 2025")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Dados em memória para demonstração
-DADOS_EXEMPLO = {
-    12345: {
-        "nome": "ESTUDANTE",
-        "sobrenome": "TESTE",
-        "presencas": {
-            "07/05/2025": "Presente",
-            "08/05/2025 19:00": "Presente",
-            "08/05/2025 20:00": "Presente",
-            "09/05/2025 19:00": "Data Futura",
-            "09/05/2025 20:00": "Data Futura"
-        }
-    },
-    54321: {
-        "nome": "ALUNO",
-        "sobrenome": "EXEMPLO",
-        "presencas": {
-            "07/05/2025": "Ausente",
-            "08/05/2025 19:00": "Ausente",
-            "08/05/2025 20:00": "Ausente",
-            "09/05/2025 19:00": "Data Futura",
-            "09/05/2025 20:00": "Data Futura"
-        }
-    }
-}
+# Evento de inicialização
+@app.on_event("startup")
+async def startup_db_client():
+    # Inicializar conexão com o Parse Server
+    if await database.init_db():
+        # Se a conexão for bem-sucedida, garantir que a classe Presenca existe
+        await database.ensure_presenca_class()
 
 # Rota principal - página inicial
 @app.get("/", response_class=HTMLResponse)
@@ -44,16 +27,17 @@ async def index(request: Request):
         {"request": request, "titulo": "Consulta presença QR Code Hack Barão 2025"}
     )
 
-# Rota para consultar presença (usando dados em memória)
+# Rota para consultar presença
 @app.post("/consultar", response_class=HTMLResponse)
 async def consultar(request: Request, codigo: str = Form(...)):
     try:
         # Converter código para inteiro
         id_estudante = int(codigo)
         
-        # Buscar dados de presença nos dados de exemplo
-        if id_estudante in DADOS_EXEMPLO:
-            aluno = DADOS_EXEMPLO[id_estudante]
+        # Buscar dados de presença
+        aluno = await database.buscar_aluno(id_estudante)
+        
+        if aluno:
             return templates.TemplateResponse(
                 "resultado.html", 
                 {
@@ -99,3 +83,13 @@ async def consultar(request: Request, codigo: str = Form(...)):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# Rota para testar a conexão com o Parse Server
+@app.get("/test-parse")
+async def test_parse():
+    try:
+        # Inicializar conexão com o Parse Server
+        result = await database.init_db()
+        return {"status": "success" if result else "error", "connected": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
