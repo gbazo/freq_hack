@@ -1,7 +1,7 @@
 import pandas as pd
 import os
-from database import presenca_collection  # Removido o prefixo "app."
-from models import Presenca  # Removido o prefixo "app."
+from database import presenca_collection
+from models import Presenca
 
 # Mapeamento de status
 STATUS_MAP = {
@@ -10,7 +10,7 @@ STATUS_MAP = {
     2: "Data Futura"
 }
 
-# Função para carregar dados do Excel para o MongoDB
+# Função para carregar dados do Excel para o Parse Server
 async def carregar_dados_excel():
     # Caminho para o arquivo Excel
     excel_path = os.path.join("data", "Frequencia Hack.xlsx")
@@ -22,13 +22,13 @@ async def carregar_dados_excel():
     # Ler o arquivo Excel
     df = pd.read_excel(excel_path)
     
-    # Verificar se já existem dados no banco
-    count = await presenca_collection.count_documents({})
+    # Verificar se já existem dados no Parse Server
+    count = await presenca_collection.count_documents()
     if count > 0:
-        print("Dados já existem no banco. Pulando importação.")
+        print("Dados já existem no Parse Server. Pulando importação.")
         return
     
-    # Preparar dados para inserção no banco
+    # Preparar dados para inserção no Parse Server
     dados = []
     for _, row in df.iterrows():
         presenca = {
@@ -44,15 +44,16 @@ async def carregar_dados_excel():
         }
         dados.append(presenca)
     
-    # Inserir dados no MongoDB
+    # Inserir dados no Parse Server
     if dados:
         await presenca_collection.insert_many(dados)
-        print(f"{len(dados)} registros inseridos no MongoDB.")
+        print(f"{len(dados)} registros inseridos no Parse Server.")
 
 # Função para obter os dados de presença de um aluno pelo ID
 async def buscar_presenca(id_estudante: int):
-    # Buscar no banco de dados
-    resultado = await presenca_collection.find_one({"id_estudante": id_estudante})
+    # Buscar no Parse Server
+    query = {"id_estudante": id_estudante}
+    resultado = await presenca_collection.find_one(query)
     
     if not resultado:
         return None
